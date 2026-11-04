@@ -35,6 +35,7 @@ class Game:
         self.manager = manager
         self.book = book
         self.board = chess.Board()
+        self._typed = False
 
     @property
     def our_turn(self) -> bool:
@@ -43,7 +44,7 @@ class Game:
     def outcome(self) -> chess.Outcome | None:
         return self.board.outcome(claim_draw=True)
 
-    def apply_opponent_move(self, text: str) -> chess.Move:
+    def apply_opponent_move(self, text: str, entry_latency: float | None = None) -> chess.Move:
         try:
             move = chess.Move.from_uci(text.strip().lower())
         except ValueError as error:
@@ -51,6 +52,9 @@ class Game:
         if move not in self.board.legal_moves:
             raise IllegalMove(text)
         self.engine.stop_ponder()
+        if entry_latency is not None:
+            self.clock.record_entry(entry_latency)
+        self._typed = True
         number = self.board.fullmove_number
         mover = self.board.turn
         self.board.push(move)
@@ -71,13 +75,15 @@ class Game:
             result.move = legal[0]
             result.source = "forced"
         else:
-            budget = self.manager.budget(board, self.clock.remaining)
+            overhead = self.clock.expected_overhead(self._typed)
+            budget = self.manager.budget(board, self.clock.remaining, overhead)
             result = self.engine.search(board, budget, self.manager)
         number = board.fullmove_number
         mover = board.turn
         result.san = board.san(result.move)
         board.push(result.move)
-        self.clock.spend(result.elapsed)
+        self.clock.spend(result.elapsed, self._typed)
+        self._typed = False
         self.logger.engine_move(number, mover, result, self.clock.remaining)
         self._ponder(result)
         return result

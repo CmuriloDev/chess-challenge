@@ -48,14 +48,17 @@ class TimeManager:
         self.overhead = overhead
         self.safety = safety
 
-    def budget(self, board: chess.Board, remaining: float) -> TimeBudget:
+    def budget(
+        self, board: chess.Board, remaining: float, overhead: float | None = None
+    ) -> TimeBudget:
+        overhead = self.overhead if overhead is None else overhead
         if remaining < self.safety:
             soft = max(0.1, remaining * PANIC_SOFT_SHARE)
             hard = max(soft, min(soft * 2.0, remaining * MAX_HARD_SHARE))
             return TimeBudget(soft, hard)
         moves_left = 20 + 25 * game_phase(board)
         usable = remaining - self.safety
-        soft = usable / moves_left + (self.increment - self.overhead)
+        soft = usable / moves_left + (self.increment - overhead)
         soft = max(MIN_SOFT, min(soft, remaining * MAX_SOFT_SHARE))
         hard = max(soft, min(soft * HARD_MULTIPLIER, remaining * MAX_HARD_SHARE))
         return TimeBudget(soft, hard)

@@ -78,6 +78,14 @@ class GameTest(unittest.TestCase):
         self.assertEqual(result.move, legal[0])
         self.assertEqual(result.source, "forced")
 
+    def test_opponent_entry_latency_is_charged_to_the_clock(self):
+        game = self.make(directory=self.directory.name)
+        game.choose_move()
+        before = game.clock.remaining
+        game.apply_opponent_move("e7e5", entry_latency=6.0)
+        game.choose_move()
+        self.assertAlmostEqual(game.clock.remaining, before - 0.2 - 5.0 - 6.0 + 10.0)
+
     def test_undo_restores_previous_position(self):
         game = self.make(directory=self.directory.name)
         game.choose_move()

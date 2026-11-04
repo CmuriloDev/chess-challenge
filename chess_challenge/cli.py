@@ -50,7 +50,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--log-dir", type=Path)
     parser.add_argument("--time", default="15:00")
     parser.add_argument("--increment", type=float, default=10.0)
-    parser.add_argument("--overhead", type=float, default=5.0)
+    parser.add_argument("--overhead", type=float, default=2.0)
+    parser.add_argument("--entry-estimate", type=float, default=3.0)
     parser.add_argument("--no-ponder", action="store_true")
     return parser
 
@@ -62,6 +63,7 @@ def config_from_args(args: argparse.Namespace) -> Config:
         total_time=parse_clock(args.time),
         increment=args.increment,
         move_overhead=args.overhead,
+        entry_estimate=args.entry_estimate,
         ponder=not args.no_ponder,
     )
     if args.engine is not None:
@@ -184,7 +186,12 @@ def main(argv: list[str] | None = None) -> int:
                     overhead=config.move_overhead,
                     ponder=config.ponder,
                 )
-                clock = Clock(config.total_time, config.increment, config.move_overhead)
+                clock = Clock(
+                    config.total_time,
+                    config.increment,
+                    config.move_overhead,
+                    config.entry_estimate,
+                )
                 manager = TimeManager(config.increment, config.move_overhead)
                 game = Game(config, engine, args.color, logger, clock, manager, book)
                 print(f"{engine.name} | log: {logger.path}")

@@ -23,8 +23,34 @@ class ClockTest(unittest.TestCase):
 
     def test_spend_applies_overhead_and_increment(self):
         clock = Clock(900.0, 10.0, 5.0)
-        clock.spend(20.0)
+        clock.spend(20.0, typed=False)
         self.assertEqual(clock.remaining, 885.0)
+
+    def test_spend_uses_measured_entry_latency(self):
+        clock = Clock(900.0, 10.0, 2.0, entry_estimate=3.0)
+        clock.record_entry(4.0)
+        clock.spend(20.0)
+        self.assertEqual(clock.remaining, 900.0 - 20.0 - 2.0 - 4.0 + 10.0)
+
+    def test_spend_falls_back_to_entry_estimate(self):
+        clock = Clock(900.0, 10.0, 2.0, entry_estimate=3.0)
+        clock.spend(20.0)
+        self.assertEqual(clock.remaining, 900.0 - 20.0 - 2.0 - 3.0 + 10.0)
+
+    def test_measured_entry_is_used_only_once(self):
+        clock = Clock(900.0, 0.0, 0.0, entry_estimate=3.0)
+        clock.record_entry(5.0)
+        clock.spend(0.0)
+        clock.spend(0.0)
+        self.assertEqual(clock.remaining, 900.0 - 5.0 - 3.0)
+
+    def test_expected_overhead_follows_recent_measurements(self):
+        clock = Clock(900.0, 10.0, 2.0, entry_estimate=3.0)
+        self.assertEqual(clock.expected_overhead(), 5.0)
+        clock.record_entry(1.0)
+        clock.record_entry(3.0)
+        self.assertEqual(clock.expected_overhead(), 4.0)
+        self.assertEqual(clock.expected_overhead(typed=False), 2.0)
 
     def test_clock_never_goes_negative(self):
         clock = Clock(3.0, 0.0, 5.0)

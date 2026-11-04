@@ -34,7 +34,8 @@ class Config:
     log_dir: Path = ROOT / "logs"
     total_time: float = 900.0
     increment: float = 10.0
-    move_overhead: float = 5.0
+    move_overhead: float = 2.0
+    entry_estimate: float = 3.0
     ponder: bool = True
     book_max_plies: int = 10
     tablebase_max_pieces: int = 5
