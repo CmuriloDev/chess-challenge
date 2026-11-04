@@ -4,6 +4,16 @@ Software de xadrez para o III Chess Challenge. Roda 100% local: usa o Stockfish 
 
 Licença: GPLv3. Veja `DECLARACAO.md` para o projeto-base, o commit de origem e a autoria.
 
+## Participantes
+
+-Carlos Murilo Nogueira Portela
+-Pedro de Carvalho Lima
+-Antônio Santana Castelo Branco Bisneto
+
+## Instituição
+
+-Icev
+
 ## Instalação
 
 Requer Python 3.10 ou superior.
