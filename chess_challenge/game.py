@@ -37,6 +37,7 @@ class Game:
         self.book = book
         self.board = chess.Board()
         self._typed = False
+        self.ponder_board: chess.Board | None = None
 
     @property
     def our_turn(self) -> bool:
@@ -53,6 +54,7 @@ class Game:
         if move not in self.board.legal_moves:
             raise IllegalMove(text)
         self.engine.stop_ponder()
+        self.ponder_board = None
         if entry_latency is not None:
             self.clock.record_entry(entry_latency)
         self._typed = True
@@ -97,10 +99,12 @@ class Game:
             return
         predicted = self.board.copy()
         predicted.push(reply)
+        self.ponder_board = predicted
         self.engine.start_ponder(predicted)
 
     def undo(self) -> chess.Move | None:
         self.engine.stop_ponder()
+        self.ponder_board = None
         if not self.board.move_stack:
             return None
         return self.board.pop()
@@ -111,5 +115,6 @@ class Game:
         except ValueError as error:
             raise IllegalMove(fen) from error
         self.engine.stop_ponder()
+        self.ponder_board = None
         self.board = board
         self.logger.event(f"fen={board.fen()}")

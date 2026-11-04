@@ -73,3 +73,13 @@ def cell_of(square: chess.Square, flipped: bool) -> tuple[int, int]:
     if flipped:
         return 7 - file, rank
     return file, 7 - rank
+
+
+def orient_score(score: str, color: chess.Color) -> str:
+    if color == chess.WHITE or score == "n/a":
+        return score
+    if score.startswith("#"):
+        value = int(score[1:])
+        return f"#{-value}"
+    value = float(score)
+    return f"{-value:+.2f}"

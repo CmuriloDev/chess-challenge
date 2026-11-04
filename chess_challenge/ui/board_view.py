@@ -33,12 +33,13 @@ class BoardView(tk.Canvas):
         self,
         master: tk.Misc,
         size: int = 640,
+        margin: int = 26,
         on_click: Callable[[chess.Square], None] | None = None,
     ) -> None:
         super().__init__(
             master, width=size, height=size, bg=BACKGROUND, highlightthickness=0
         )
-        self.margin = 26
+        self.margin = margin
         self.cell = (size - 2 * self.margin) // 8
         self._on_click = on_click
         self._flipped = False

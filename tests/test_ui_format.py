@@ -8,6 +8,7 @@ from chess_challenge.ui.format import (
     format_clock,
     format_count,
     move_list_rows,
+    orient_score,
     pv_text,
     square_at,
 )
@@ -30,6 +31,17 @@ class FormatTest(unittest.TestCase):
         self.assertLess(eval_fraction(-300), 0.4)
         self.assertEqual(eval_fraction(100000), 1.0)
         self.assertEqual(eval_fraction(-100000), 0.0)
+
+
+class OrientTest(unittest.TestCase):
+    def test_white_keeps_score(self):
+        self.assertEqual(orient_score("+0.32", chess.WHITE), "+0.32")
+
+    def test_black_flips_score(self):
+        self.assertEqual(orient_score("+0.32", chess.BLACK), "-0.32")
+        self.assertEqual(orient_score("-1.50", chess.BLACK), "+1.50")
+        self.assertEqual(orient_score("#3", chess.BLACK), "#-3")
+        self.assertEqual(orient_score("n/a", chess.BLACK), "n/a")
 
 
 class PvTest(unittest.TestCase):
