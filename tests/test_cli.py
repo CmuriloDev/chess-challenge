@@ -79,6 +79,22 @@ class ArgsTest(unittest.TestCase):
         self.assertFalse(config.ponder)
 
 
+class DataFlagsTest(unittest.TestCase):
+    def test_no_book_and_no_syzygy_disable_data(self):
+        args = build_parser().parse_args(["--color", "white", "--no-book", "--no-syzygy"])
+        config = config_from_args(args)
+        self.assertIsNone(config.book_path)
+        self.assertIsNone(config.syzygy_path)
+
+    def test_explicit_paths_override_discovery(self):
+        args = build_parser().parse_args(
+            ["--color", "white", "--book", "a.bin", "--syzygy", "tb"]
+        )
+        config = config_from_args(args)
+        self.assertEqual(config.book_path, Path("a.bin"))
+        self.assertEqual(config.syzygy_path, Path("tb"))
+
+
 @unittest.skipUnless(Config().engine_path.exists(), "stockfish binary not available")
 class CliSmokeTest(unittest.TestCase):
     def test_plays_a_move_and_logs_it(self):

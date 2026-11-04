@@ -46,7 +46,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--threads", type=int)
     parser.add_argument("--hash", type=int, dest="hash_mb")
     parser.add_argument("--book", type=Path)
+    parser.add_argument("--no-book", action="store_true")
     parser.add_argument("--syzygy", type=Path)
+    parser.add_argument("--no-syzygy", action="store_true")
     parser.add_argument("--log-dir", type=Path)
     parser.add_argument("--time", default="15:00")
     parser.add_argument("--increment", type=float, default=10.0)
@@ -58,14 +60,20 @@ def build_parser() -> argparse.ArgumentParser:
 
 def config_from_args(args: argparse.Namespace) -> Config:
     config = Config(
-        book_path=args.book,
-        syzygy_path=args.syzygy,
         total_time=parse_clock(args.time),
         increment=args.increment,
         move_overhead=args.overhead,
         entry_estimate=args.entry_estimate,
         ponder=not args.no_ponder,
     )
+    if args.no_book:
+        config.book_path = None
+    elif args.book is not None:
+        config.book_path = args.book
+    if args.no_syzygy:
+        config.syzygy_path = None
+    elif args.syzygy is not None:
+        config.syzygy_path = args.syzygy
     if args.engine is not None:
         config.engine_path = args.engine
     if args.threads is not None:

@@ -20,6 +20,22 @@ def default_engine_path() -> Path:
     return local
 
 
+def default_book_path() -> Path | None:
+    folder = ROOT / "data" / "book"
+    preferred = folder / "komodo.bin"
+    if preferred.exists():
+        return preferred
+    found = sorted(folder.glob("*.bin")) if folder.exists() else []
+    return found[0] if found else None
+
+
+def default_syzygy_path() -> Path | None:
+    folder = ROOT / "data" / "syzygy"
+    if folder.exists() and any(folder.glob("*.rtbw")):
+        return folder
+    return None
+
+
 def default_threads() -> int:
     return max(1, (os.cpu_count() or 2) - 2)
 
@@ -29,8 +45,8 @@ class Config:
     engine_path: Path = field(default_factory=default_engine_path)
     threads: int = field(default_factory=default_threads)
     hash_mb: int = 8192
-    book_path: Path | None = None
-    syzygy_path: Path | None = None
+    book_path: Path | None = field(default_factory=default_book_path)
+    syzygy_path: Path | None = field(default_factory=default_syzygy_path)
     log_dir: Path = ROOT / "logs"
     total_time: float = 900.0
     increment: float = 10.0
