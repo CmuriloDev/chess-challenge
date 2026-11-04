@@ -40,6 +40,7 @@ class Engine:
             raise FileNotFoundError(f"Stockfish nao encontrado em {config.engine_path}")
         self._engine = chess.engine.SimpleEngine.popen_uci(str(config.engine_path))
         self._game = object()
+        self._ponder: chess.engine.SimpleAnalysis | None = None
         self._configure(config)
 
     def _configure(self, config: Config) -> None:
@@ -57,7 +58,24 @@ class Engine:
     def new_game(self) -> None:
         self._game = object()
 
+    def start_ponder(self, board: chess.Board) -> None:
+        self.stop_ponder()
+        if board.is_game_over():
+            return
+        self._ponder = self._engine.analysis(board, chess.engine.Limit(), game=self._game)
+
+    def stop_ponder(self) -> None:
+        analysis, self._ponder = self._ponder, None
+        if analysis is None:
+            return
+        try:
+            analysis.stop()
+            analysis.wait()
+        except chess.engine.EngineError:
+            pass
+
     def search(self, board: chess.Board, budget: TimeBudget, manager: TimeManager) -> SearchResult:
+        self.stop_ponder()
         start = time.perf_counter()
         tracker = SearchTracker(board.turn)
         limit = chess.engine.Limit(time=budget.hard + LIMIT_GRACE)
@@ -87,6 +105,7 @@ class Engine:
         )
 
     def close(self) -> None:
+        self.stop_ponder()
         try:
             self._engine.quit()
         except chess.engine.EngineError:

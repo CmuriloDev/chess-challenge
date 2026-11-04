@@ -16,6 +16,14 @@ from chess_challenge.timemanager import TimeManager
 class StubEngine:
     def __init__(self):
         self.calls = 0
+        self.pondered = []
+        self.stops = 0
+
+    def start_ponder(self, board):
+        self.pondered.append(board.fen())
+
+    def stop_ponder(self):
+        self.stops += 1
 
     def search(self, board, budget, manager):
         self.calls += 1
@@ -81,6 +89,48 @@ class GameTest(unittest.TestCase):
         game = self.make(directory=self.directory.name)
         with self.assertRaises(IllegalMove):
             game.set_fen("not a fen")
+
+
+class PonderTest(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+
+    def make(self, ponder):
+        engine = StubEngine()
+        game = build_game(engine, directory=self.directory.name)
+        game.config.ponder = ponder
+        self.addCleanup(game.logger.close)
+        return game, engine
+
+    def test_ponders_on_predicted_reply_when_enabled(self):
+        game, engine = self.make(True)
+        first = next(iter(game.board.legal_moves))
+        board = game.board.copy()
+        board.push(first)
+        reply = next(iter(board.legal_moves))
+        game.engine.search = lambda b, budget, manager: SearchResult(
+            first, 10, 1000, "+0.10", [first, reply], 0.2, "engine"
+        )
+        game.choose_move()
+        board.push(reply)
+        self.assertEqual(engine.pondered, [board.fen()])
+
+    def test_does_not_ponder_when_disabled(self):
+        game, engine = self.make(False)
+        first = next(iter(game.board.legal_moves))
+        game.engine.search = lambda b, budget, manager: SearchResult(
+            first, 10, 1000, "+0.10", [first, first], 0.2, "engine"
+        )
+        game.choose_move()
+        self.assertEqual(engine.pondered, [])
+
+    def test_opponent_move_stops_pondering(self):
+        game, engine = self.make(True)
+        game.board.push_uci("e2e4")
+        before = engine.stops
+        game.apply_opponent_move("e7e5")
+        self.assertEqual(engine.stops, before + 1)
 
 
 class RealEngineGameTest(unittest.TestCase):

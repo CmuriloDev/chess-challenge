@@ -50,6 +50,7 @@ class Game:
             raise IllegalMove(text) from error
         if move not in self.board.legal_moves:
             raise IllegalMove(text)
+        self.engine.stop_ponder()
         number = self.board.fullmove_number
         mover = self.board.turn
         self.board.push(move)
@@ -78,9 +79,21 @@ class Game:
         board.push(result.move)
         self.clock.spend(result.elapsed)
         self.logger.engine_move(number, mover, result, self.clock.remaining)
+        self._ponder(result)
         return result
 
+    def _ponder(self, result: SearchResult) -> None:
+        if not self.config.ponder or len(result.pv) < 2 or self.outcome() is not None:
+            return
+        reply = result.pv[1]
+        if reply not in self.board.legal_moves:
+            return
+        predicted = self.board.copy()
+        predicted.push(reply)
+        self.engine.start_ponder(predicted)
+
     def undo(self) -> chess.Move | None:
+        self.engine.stop_ponder()
         if not self.board.move_stack:
             return None
         return self.board.pop()
@@ -90,5 +103,6 @@ class Game:
             board = chess.Board(fen)
         except ValueError as error:
             raise IllegalMove(fen) from error
+        self.engine.stop_ponder()
         self.board = board
         self.logger.event(f"fen={board.fen()}")
