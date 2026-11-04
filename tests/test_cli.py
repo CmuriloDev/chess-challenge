@@ -102,7 +102,7 @@ class CliSmokeTest(unittest.TestCase):
             completed = subprocess.run(
                 [
                     sys.executable, "-m", "chess_challenge",
-                    "--color", "white", "--threads", "1", "--hash", "16",
+                    "--cli", "--color", "white", "--threads", "1", "--hash", "16",
                     "--time", "0:30", "--increment", "0", "--overhead", "0",
                     "--log-dir", directory,
                 ],

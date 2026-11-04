@@ -10,6 +10,7 @@ from chess_challenge.ui.format import (
     move_list_rows,
     orient_score,
     pv_text,
+    score_to_cp,
     square_at,
 )
 
@@ -42,6 +43,14 @@ class OrientTest(unittest.TestCase):
         self.assertEqual(orient_score("-1.50", chess.BLACK), "+1.50")
         self.assertEqual(orient_score("#3", chess.BLACK), "#-3")
         self.assertEqual(orient_score("n/a", chess.BLACK), "n/a")
+
+
+class ScoreToCpTest(unittest.TestCase):
+    def test_conversion(self):
+        self.assertEqual(score_to_cp("+0.32"), 32)
+        self.assertEqual(score_to_cp("-1.50"), -150)
+        self.assertEqual(score_to_cp("#3"), 100000)
+        self.assertEqual(score_to_cp("#-2"), -100000)
 
 
 class PvTest(unittest.TestCase):
