@@ -3,13 +3,10 @@ from pathlib import Path
 
 import chess
 
-from .book import Book
-from .clock import Clock, parse_clock
+from .clock import parse_clock
 from .config import Config
-from .engine import Engine
 from .game import Game, IllegalMove
-from .logger import GameLogger
-from .timemanager import TimeManager
+from .session import open_game
 
 HELP = """Comandos:
   <lance>         lance do adversario em UCI (e2e4, g1f3, e7e8q)
@@ -174,40 +171,19 @@ def loop(game: Game) -> None:
             return
 
 
-def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
-    config = config_from_args(args)
+def run_cli(config: Config, color: chess.Color) -> int:
     try:
-        book = Book(config.book_path, config.book_max_plies)
-        with Engine(config) as engine:
-            logger = GameLogger(config.log_dir)
-            try:
-                logger.header(
-                    engine=engine.name,
-                    color="white" if args.color == chess.WHITE else "black",
-                    threads=config.threads,
-                    hash_mb=config.hash_mb,
-                    book=config.book_path,
-                    syzygy=config.syzygy_path,
-                    time=config.total_time,
-                    increment=config.increment,
-                    overhead=config.move_overhead,
-                    ponder=config.ponder,
-                )
-                clock = Clock(
-                    config.total_time,
-                    config.increment,
-                    config.move_overhead,
-                    config.entry_estimate,
-                )
-                manager = TimeManager(config.increment, config.move_overhead)
-                game = Game(config, engine, args.color, logger, clock, manager, book)
-                print(f"{engine.name} | log: {logger.path}")
-                print("Digite 'help' para ver os comandos.")
-                loop(game)
-            finally:
-                logger.close()
+        with open_game(config, color) as game:
+            print(f"{game.engine.name} | log: {game.logger.path}")
+            print("Digite 'help' para ver os comandos.")
+            loop(game)
     except FileNotFoundError as error:
         print(error)
         return 1
     return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    config = config_from_args(args)
+    return run_cli(config, args.color)
