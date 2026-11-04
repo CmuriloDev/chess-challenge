@@ -1,5 +1,6 @@
 import re
 import sys
+import time
 import urllib.request
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
@@ -13,7 +14,8 @@ SYZYGY_INDEXES = (
     "https://tablebase.lichess.ovh/tables/standard/3-4-5-wdl/",
     "https://tablebase.lichess.ovh/tables/standard/3-4-5-dtz/",
 )
-WORKERS = 4
+WORKERS = 2
+ATTEMPTS = 6
 HEADERS = {"User-Agent": "chess-challenge-fetch"}
 
 
@@ -22,6 +24,17 @@ def open_url(url: str):
 
 
 def download(url: str, target: Path) -> str:
+    for attempt in range(1, ATTEMPTS + 1):
+        try:
+            return download_once(url, target)
+        except (OSError, IOError):
+            if attempt == ATTEMPTS:
+                raise
+            time.sleep(2 * attempt)
+    return "falhou"
+
+
+def download_once(url: str, target: Path) -> str:
     with open_url(url) as response:
         expected = int(response.headers.get("Content-Length", 0))
         if target.exists() and expected and target.stat().st_size == expected:
@@ -52,8 +65,15 @@ def fetch_book() -> None:
 
 
 def list_tablebases(index: str) -> list[str]:
-    with open_url(index) as response:
-        page = response.read().decode("utf-8", "replace")
+    for attempt in range(1, ATTEMPTS + 1):
+        try:
+            with open_url(index) as response:
+                page = response.read().decode("utf-8", "replace")
+            break
+        except OSError:
+            if attempt == ATTEMPTS:
+                raise
+            time.sleep(2 * attempt)
     names = sorted(set(re.findall(r'href="([^"/]+\.rtb[wz])"', page)))
     return [index + name for name in names]
 
