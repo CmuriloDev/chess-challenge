@@ -24,7 +24,7 @@ GLYPHS = {
     chess.ROOK: "♜",
     chess.BISHOP: "♝",
     chess.KNIGHT: "♞",
-    chess.PAWN: "♟︎",
+    chess.PAWN: "♟",
 }
 
 
