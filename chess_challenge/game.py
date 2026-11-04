@@ -1,0 +1,94 @@
+import time
+
+import chess
+
+from .book import Book
+from .clock import Clock
+from .config import Config
+from .engine import Engine, SearchResult
+from .logger import GameLogger
+from .timemanager import TimeBudget, TimeManager
+
+FORCED_MOVE_BUDGET = TimeBudget(0.05, 0.1)
+
+
+class IllegalMove(Exception):
+    pass
+
+
+class Game:
+    def __init__(
+        self,
+        config: Config,
+        engine: Engine,
+        color: chess.Color,
+        logger: GameLogger,
+        clock: Clock,
+        manager: TimeManager,
+        book: Book,
+    ) -> None:
+        self.config = config
+        self.engine = engine
+        self.color = color
+        self.logger = logger
+        self.clock = clock
+        self.manager = manager
+        self.book = book
+        self.board = chess.Board()
+
+    @property
+    def our_turn(self) -> bool:
+        return self.board.turn == self.color
+
+    def outcome(self) -> chess.Outcome | None:
+        return self.board.outcome(claim_draw=True)
+
+    def apply_opponent_move(self, text: str) -> chess.Move:
+        try:
+            move = chess.Move.from_uci(text.strip().lower())
+        except ValueError as error:
+            raise IllegalMove(text) from error
+        if move not in self.board.legal_moves:
+            raise IllegalMove(text)
+        number = self.board.fullmove_number
+        mover = self.board.turn
+        self.board.push(move)
+        self.logger.opponent_move(number, mover, move)
+        return move
+
+    def choose_move(self) -> SearchResult:
+        board = self.board
+        start = time.perf_counter()
+        legal = list(board.legal_moves)
+        book_move = self.book.pick(board)
+        if book_move is not None:
+            result = SearchResult(
+                book_move, 0, 0, "n/a", [book_move], time.perf_counter() - start, "book"
+            )
+        elif len(legal) == 1:
+            result = self.engine.search(board, FORCED_MOVE_BUDGET, self.manager)
+            result.move = legal[0]
+            result.source = "forced"
+        else:
+            budget = self.manager.budget(board, self.clock.remaining)
+            result = self.engine.search(board, budget, self.manager)
+        number = board.fullmove_number
+        mover = board.turn
+        result.san = board.san(result.move)
+        board.push(result.move)
+        self.clock.spend(result.elapsed)
+        self.logger.engine_move(number, mover, result, self.clock.remaining)
+        return result
+
+    def undo(self) -> chess.Move | None:
+        if not self.board.move_stack:
+            return None
+        return self.board.pop()
+
+    def set_fen(self, fen: str) -> None:
+        try:
+            board = chess.Board(fen)
+        except ValueError as error:
+            raise IllegalMove(fen) from error
+        self.board = board
+        self.logger.event(f"fen={board.fen()}")
