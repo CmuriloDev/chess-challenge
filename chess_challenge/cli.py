@@ -38,7 +38,8 @@ def parse_color(text: str) -> chess.Color:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="chess_challenge")
-    parser.add_argument("--color", type=parse_color, required=True)
+    parser.add_argument("--color", type=parse_color)
+    parser.add_argument("--cli", action="store_true")
     parser.add_argument("--engine", type=Path)
     parser.add_argument("--threads", type=int)
     parser.add_argument("--hash", type=int, dest="hash_mb")
@@ -184,6 +185,13 @@ def run_cli(config: Config, color: chess.Color) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
     config = config_from_args(args)
-    return run_cli(config, args.color)
+    if args.cli:
+        if args.color is None:
+            parser.error("--color e obrigatorio com --cli")
+        return run_cli(config, args.color)
+    from .ui.app import run_gui
+
+    return run_gui(config, args.color)
