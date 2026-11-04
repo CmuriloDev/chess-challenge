@@ -1,11 +1,12 @@
 import time
+from typing import Callable
 
 import chess
 
 from .book import Book
 from .clock import Clock
 from .config import Config
-from .engine import Engine, SearchResult
+from .engine import Engine, LiveInfo, SearchResult
 from .logger import GameLogger
 from .timemanager import TimeBudget, TimeManager
 
@@ -61,7 +62,7 @@ class Game:
         self.logger.opponent_move(number, mover, move)
         return move
 
-    def choose_move(self) -> SearchResult:
+    def choose_move(self, on_info: Callable[[LiveInfo], None] | None = None) -> SearchResult:
         board = self.board
         start = time.perf_counter()
         legal = list(board.legal_moves)
@@ -71,13 +72,13 @@ class Game:
                 book_move, 0, 0, "n/a", [book_move], time.perf_counter() - start, "book"
             )
         elif len(legal) == 1:
-            result = self.engine.search(board, FORCED_MOVE_BUDGET, self.manager)
+            result = self.engine.search(board, FORCED_MOVE_BUDGET, self.manager, on_info)
             result.move = legal[0]
             result.source = "forced"
         else:
             overhead = self.clock.expected_overhead(self._typed)
             budget = self.manager.budget(board, self.clock.remaining, overhead)
-            result = self.engine.search(board, budget, self.manager)
+            result = self.engine.search(board, budget, self.manager, on_info)
         number = board.fullmove_number
         mover = board.turn
         result.san = board.san(result.move)

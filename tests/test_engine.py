@@ -1,3 +1,4 @@
+import time
 import unittest
 
 import chess
@@ -29,6 +30,24 @@ class EngineTest(unittest.TestCase):
         self.assertLess(result.elapsed, 1.5)
         self.assertGreater(result.depth, 0)
         self.assertGreater(result.nodes, 0)
+
+    def test_reports_live_info_while_searching(self):
+        updates = []
+        self.engine.search(chess.Board(), TimeBudget(0.5, 1.0), self.manager, updates.append)
+        self.assertGreater(len(updates), 0)
+        depths = [item.depth for item in updates]
+        self.assertEqual(depths, sorted(depths))
+        self.assertTrue(all(item.pv for item in updates))
+
+    def test_ponder_reports_info_and_stops_cleanly(self):
+        board = chess.Board()
+        board.push_uci("e2e4")
+        self.engine.start_ponder(board)
+        time.sleep(0.5)
+        live = self.engine.ponder_live()
+        self.engine.stop_ponder()
+        self.assertIsNotNone(live)
+        self.assertIsNone(self.engine.ponder_live())
 
     def test_finds_mate_in_one(self):
         board = chess.Board("r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4")

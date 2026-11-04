@@ -1,6 +1,7 @@
 import os
 import time
 from dataclasses import dataclass, field
+from typing import Any, Callable, Mapping
 
 import chess
 import chess.engine
@@ -23,6 +24,32 @@ class SearchResult:
     elapsed: float
     source: str
     san: str = field(default="")
+
+
+@dataclass
+class LiveInfo:
+    depth: int
+    score: str
+    centipawns: int
+    nodes: int
+    nps: int
+    pv: list[chess.Move]
+    elapsed: float
+
+
+def make_live(info: Mapping[str, Any], elapsed: float) -> LiveInfo | None:
+    score = info.get("score")
+    if score is None or not info.get("depth"):
+        return None
+    return LiveInfo(
+        depth=int(info["depth"]),
+        score=format_score(score),
+        centipawns=score.white().score(mate_score=100000),
+        nodes=int(info.get("nodes", 0)),
+        nps=int(info.get("nps", 0)),
+        pv=list(info.get("pv") or []),
+        elapsed=elapsed,
+    )
 
 
 def format_score(score: chess.engine.PovScore | None) -> str:
@@ -74,8 +101,21 @@ class Engine:
         except chess.engine.EngineError:
             pass
 
-    def search(self, board: chess.Board, budget: TimeBudget, manager: TimeManager) -> SearchResult:
+    def ponder_live(self) -> LiveInfo | None:
+        analysis = self._ponder
+        if analysis is None:
+            return None
+        return make_live(dict(analysis.info), 0.0)
+
+    def search(
+        self,
+        board: chess.Board,
+        budget: TimeBudget,
+        manager: TimeManager,
+        on_info: Callable[[LiveInfo], None] | None = None,
+    ) -> SearchResult:
         self.stop_ponder()
+        last_depth = 0
         start = time.perf_counter()
         tracker = SearchTracker(board.turn)
         limit = chess.engine.Limit(time=budget.hard + LIMIT_GRACE)
@@ -83,7 +123,13 @@ class Engine:
             while True:
                 time.sleep(POLL_INTERVAL)
                 elapsed = time.perf_counter() - start
-                tracker.update(dict(analysis.info), elapsed)
+                info = dict(analysis.info)
+                tracker.update(info, elapsed)
+                if on_info is not None and info.get("depth", 0) != last_depth:
+                    live = make_live(info, elapsed)
+                    if live is not None:
+                        last_depth = live.depth
+                        on_info(live)
                 if manager.should_stop(elapsed, budget, tracker):
                     break
             analysis.stop()

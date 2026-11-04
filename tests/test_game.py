@@ -25,7 +25,7 @@ class StubEngine:
     def stop_ponder(self):
         self.stops += 1
 
-    def search(self, board, budget, manager):
+    def search(self, board, budget, manager, on_info=None):
         self.calls += 1
         move = next(iter(board.legal_moves))
         return SearchResult(move, 10, 1000, "+0.10", [move], 0.2, "engine")
@@ -117,7 +117,7 @@ class PonderTest(unittest.TestCase):
         board = game.board.copy()
         board.push(first)
         reply = next(iter(board.legal_moves))
-        game.engine.search = lambda b, budget, manager: SearchResult(
+        game.engine.search = lambda b, budget, manager, on_info=None: SearchResult(
             first, 10, 1000, "+0.10", [first, reply], 0.2, "engine"
         )
         game.choose_move()
@@ -127,7 +127,7 @@ class PonderTest(unittest.TestCase):
     def test_does_not_ponder_when_disabled(self):
         game, engine = self.make(False)
         first = next(iter(game.board.legal_moves))
-        game.engine.search = lambda b, budget, manager: SearchResult(
+        game.engine.search = lambda b, budget, manager, on_info=None: SearchResult(
             first, 10, 1000, "+0.10", [first, first], 0.2, "engine"
         )
         game.choose_move()
