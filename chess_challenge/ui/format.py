@@ -83,3 +83,9 @@ def orient_score(score: str, color: chess.Color) -> str:
         return f"#{-value}"
     value = float(score)
     return f"{-value:+.2f}"
+
+
+def score_to_cp(score: str) -> int:
+    if score.startswith("#"):
+        return 100000 if int(score[1:]) > 0 else -100000
+    return int(round(float(score) * 100))
