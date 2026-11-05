@@ -113,13 +113,11 @@ class Game:
         return result
 
     def _ponder(self, result: SearchResult) -> None:
-        if not self.config.ponder or len(result.pv) < 2 or self.outcome() is not None:
-            return
-        reply = result.pv[1]
-        if reply not in self.board.legal_moves:
+        if not self.config.ponder or self.outcome() is not None:
             return
         predicted = self.board.copy()
-        predicted.push(reply)
+        if len(result.pv) >= 2 and result.pv[1] in predicted.legal_moves:
+            predicted.push(result.pv[1])
         self.ponder_board = predicted
         self.engine.start_ponder(predicted)
 

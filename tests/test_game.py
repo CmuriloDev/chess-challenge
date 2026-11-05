@@ -171,6 +171,15 @@ class PonderTest(unittest.TestCase):
         board.push(reply)
         self.assertEqual(engine.pondered, [board.fen()])
 
+    def test_ponders_on_current_position_after_book_move(self):
+        game, engine = self.make(True)
+        first = next(iter(game.board.legal_moves))
+        game.engine.search = lambda b, budget, manager, on_info=None: SearchResult(
+            first, 0, 0, "n/a", [first], 0.0, "book"
+        )
+        game.choose_move()
+        self.assertEqual(engine.pondered, [game.board.fen()])
+
     def test_does_not_ponder_when_disabled(self):
         game, engine = self.make(False)
         first = next(iter(game.board.legal_moves))
