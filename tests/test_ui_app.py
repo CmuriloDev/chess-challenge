@@ -65,6 +65,7 @@ class AppTest(unittest.TestCase):
             Book(None, 10),
         )
         app = App(self.root, game)
+        self.addCleanup(app.join_worker)
         self.addCleanup(app.shutdown)
         return app
 

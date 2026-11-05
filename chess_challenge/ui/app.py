@@ -39,6 +39,18 @@ MESSAGE_MS = 7000
 PROMOTIONS = (("Dama", "q"), ("Torre", "r"), ("Bispo", "b"), ("Cavalo", "n"))
 
 
+def run_search(game: Game, events: queue.Queue, board: chess.Board) -> None:
+    def on_info(live: LiveInfo) -> None:
+        events.put(("live", live, pv_text(board, live.pv)))
+
+    try:
+        result = game.choose_move(on_info)
+    except Exception as error:
+        events.put(("error", error))
+        return
+    events.put(("done", result, pv_text(board, result.pv)))
+
+
 def enable_dpi_awareness() -> None:
     try:
         ctypes.windll.shcore.SetProcessDpiAwareness(1)
@@ -102,6 +114,7 @@ class App:
         self.ponder_tick = 0
         self.message_job: str | None = None
         self.poll_job: str | None = None
+        self.worker: threading.Thread | None = None
         self.scale = max(1.0, root.winfo_fpixels("1i") / 96.0)
         self._build()
         self.refresh()
@@ -378,18 +391,12 @@ class App:
         self.entry.configure(state="disabled")
         self.clear_eval("calculando")
         self.refresh()
-        threading.Thread(target=self.work, args=(self.think_board.copy(),), daemon=True).start()
-
-    def work(self, board: chess.Board) -> None:
-        def on_info(live: LiveInfo) -> None:
-            self.events.put(("live", live, pv_text(board, live.pv)))
-
-        try:
-            result = self.game.choose_move(on_info)
-        except Exception as error:
-            self.events.put(("error", error))
-            return
-        self.events.put(("done", result, pv_text(board, result.pv)))
+        self.worker = threading.Thread(
+            target=run_search,
+            args=(self.game, self.events, self.think_board.copy()),
+            daemon=True,
+        )
+        self.worker.start()
 
     def poll(self) -> None:
         if self.closed:
@@ -632,6 +639,10 @@ class App:
                     pass
         self.poll_job = None
         self.message_job = None
+
+    def join_worker(self, timeout: float = 10.0) -> None:
+        if self.worker is not None and self.worker.is_alive():
+            self.worker.join(timeout)
 
     def close(self) -> None:
         self.shutdown()
