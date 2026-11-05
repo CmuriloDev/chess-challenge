@@ -11,6 +11,11 @@ from .logger import GameLogger
 from .timemanager import TimeBudget, TimeManager
 
 FORCED_MOVE_BUDGET = TimeBudget(0.05, 0.1)
+FINAL_TERMINATIONS = (
+    chess.Termination.CHECKMATE,
+    chess.Termination.STALEMATE,
+    chess.Termination.INSUFFICIENT_MATERIAL,
+)
 
 
 class IllegalMove(Exception):
@@ -38,13 +43,29 @@ class Game:
         self.board = chess.Board()
         self._typed = False
         self.ponder_board: chess.Board | None = None
+        self._notice: str | None = None
 
     @property
     def our_turn(self) -> bool:
         return self.board.turn == self.color
 
     def outcome(self) -> chess.Outcome | None:
-        return self.board.outcome(claim_draw=True)
+        outcome = self.board.outcome(claim_draw=True)
+        if outcome is not None and outcome.termination in FINAL_TERMINATIONS:
+            return outcome
+        return None
+
+    def new_draw_notice(self) -> str | None:
+        outcome = self.board.outcome(claim_draw=True)
+        if outcome is None or outcome.termination in FINAL_TERMINATIONS:
+            self._notice = None
+            return None
+        name = outcome.termination.name
+        if name == self._notice:
+            return None
+        self._notice = name
+        self.logger.event(f"aviso={name} jogo continua")
+        return name
 
     def apply_opponent_move(self, text: str, entry_latency: float | None = None) -> chess.Move:
         try:

@@ -86,6 +86,53 @@ class GameTest(unittest.TestCase):
         game.choose_move()
         self.assertAlmostEqual(game.clock.remaining, before - 0.2 - 5.0 - 6.0 + 10.0)
 
+    def repeat_position(self, game, times=2):
+        for _ in range(times):
+            for uci in ("g1f3", "g8f6", "f3g1", "f6g8"):
+                game.board.push_uci(uci)
+
+    def test_threefold_repetition_does_not_end_the_game(self):
+        game = self.make(directory=self.directory.name)
+        self.repeat_position(game)
+        self.assertTrue(game.board.can_claim_threefold_repetition())
+        self.assertIsNone(game.outcome())
+
+    def test_fifty_move_rule_does_not_end_the_game(self):
+        game = self.make(directory=self.directory.name)
+        game.set_fen("4k3/8/8/8/8/8/4P3/4K2R w - - 100 80")
+        self.assertIsNone(game.outcome())
+
+    def test_draw_notice_is_reported_once_and_resets(self):
+        game = self.make(directory=self.directory.name)
+        self.assertIsNone(game.new_draw_notice())
+        self.repeat_position(game)
+        self.assertIsNotNone(game.new_draw_notice())
+        self.assertIsNone(game.new_draw_notice())
+        game.set_fen(chess.STARTING_FEN)
+        self.assertIsNone(game.new_draw_notice())
+        self.repeat_position(game)
+        self.assertIsNotNone(game.new_draw_notice())
+
+    def test_checkmate_still_ends_the_game(self):
+        game = self.make(directory=self.directory.name)
+        for uci in ("f2f3", "e7e5", "g2g4", "d8h4"):
+            game.board.push_uci(uci)
+        self.assertIsNotNone(game.outcome())
+
+    def test_stalemate_still_ends_the_game(self):
+        game = self.make(directory=self.directory.name)
+        game.set_fen("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1")
+        self.assertIsNotNone(game.outcome())
+
+    def test_keeps_choosing_moves_after_repetition(self):
+        game = self.make(directory=self.directory.name)
+        self.repeat_position(game)
+        legal = set(game.board.legal_moves)
+        plies = len(game.board.move_stack)
+        result = game.choose_move()
+        self.assertIn(result.move, legal)
+        self.assertEqual(len(game.board.move_stack), plies + 1)
+
     def test_undo_restores_previous_position(self):
         game = self.make(directory=self.directory.name)
         game.choose_move()

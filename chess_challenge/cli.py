@@ -105,6 +105,12 @@ def report_outcome(game: Game) -> bool:
     return True
 
 
+def warn_draw(game: Game) -> None:
+    notice = game.new_draw_notice()
+    if notice is not None:
+        print(f"AVISO: {notice}. O arbitro pode declarar empate, mas o programa continua jogando.")
+
+
 def handle(game: Game, text: str) -> bool:
     command, _, argument = text.partition(" ")
     command = command.lower()
@@ -164,6 +170,7 @@ def loop(game: Game) -> None:
     if game.our_turn:
         play_turn(game)
     while not report_outcome(game):
+        warn_draw(game)
         try:
             text = input("adversario> " if not game.our_turn else "voce> ").strip()
         except (EOFError, KeyboardInterrupt):

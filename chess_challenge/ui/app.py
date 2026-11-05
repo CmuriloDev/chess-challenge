@@ -317,6 +317,7 @@ class App:
         self.clock_label.configure(text=format_clock(self.game.clock.remaining))
         self.update_moves()
         self.update_banner()
+        self.warn_draw()
 
     def update_moves(self) -> None:
         self.moves.configure(state="normal")
@@ -432,6 +433,13 @@ class App:
         self.refresh()
         self.finish_if_over()
         self.focus_entry()
+
+    def warn_draw(self) -> None:
+        notice = self.game.new_draw_notice()
+        if notice is not None:
+            self.notify(
+                f"Aviso: {notice}. O arbitro pode declarar empate, mas o programa continua jogando.", WARN
+            )
 
     def finish_if_over(self) -> None:
         outcome = self.game.outcome()
