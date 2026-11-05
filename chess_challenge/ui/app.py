@@ -422,7 +422,7 @@ class App:
         self.waiting_since = time.perf_counter()
         self.first_input = None
         nps = int(result.nodes / max(result.elapsed, 1e-3))
-        source = {"book": "livro de aberturas", "forced": "lance unico"}.get(result.source, "motor")
+        source = {"book": "livro de aberturas", "forced": "lance unico", "engine-norep": "motor (evitou repeticao)"}.get(result.source, "motor")
         score = result.score
         if score != "n/a":
             self.show_eval(score, score_to_cp(score), result.depth, result.nodes, nps, pv, source)

@@ -25,7 +25,7 @@ class StubEngine:
     def stop_ponder(self):
         self.stops += 1
 
-    def search(self, board, budget, manager, on_info=None):
+    def search(self, board, budget, manager, on_info=None, root_moves=None):
         self.calls += 1
         move = next(iter(board.legal_moves))
         return SearchResult(move, 10, 1000, "+0.10", [move], 0.2, "engine")
@@ -195,6 +195,112 @@ class PonderTest(unittest.TestCase):
         before = engine.stops
         game.apply_opponent_move("e7e5")
         self.assertEqual(engine.stops, before + 1)
+
+
+class ScriptedEngine:
+    name = "Scripted"
+
+    def __init__(self, results):
+        self.results = list(results)
+        self.calls = []
+
+    def search(self, board, budget, manager, on_info=None, root_moves=None):
+        self.calls.append(root_moves)
+        return self.results.pop(0)
+
+    def start_ponder(self, board):
+        pass
+
+    def stop_ponder(self):
+        pass
+
+
+def scripted(uci, white_cp, elapsed=1.0):
+    move = chess.Move.from_uci(uci)
+    return SearchResult(move, 20, 1000, f"{white_cp / 100:+.2f}", [move], elapsed, "engine", centipawns=white_cp)
+
+
+class RepetitionAvoidanceTest(unittest.TestCase):
+    CYCLE = ("g1f3", "g8f6", "f3g1", "f6g8")
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+
+    def make(self, results, color, plies=()):
+        engine = ScriptedEngine(results)
+        game = build_game(engine, color=color, directory=self.directory.name)
+        self.addCleanup(game.logger.close)
+        for uci in plies:
+            game.board.push_uci(uci)
+        return game, engine
+
+    def test_avoids_threefold_when_better(self):
+        plies = self.CYCLE + self.CYCLE[:3]
+        game, engine = self.make([scripted("f6g8", -80), scripted("d7d6", -60)], chess.BLACK, plies)
+        result = game.choose_move()
+        self.assertEqual(result.move.uci(), "d7d6")
+        self.assertEqual(result.source, "engine-norep")
+        self.assertEqual(len(engine.calls), 2)
+        self.assertNotIn(chess.Move.from_uci("f6g8"), engine.calls[1])
+        self.assertAlmostEqual(result.elapsed, 2.0)
+
+    def test_accepts_threefold_when_not_better(self):
+        plies = self.CYCLE + self.CYCLE[:3]
+        game, engine = self.make([scripted("f6g8", -10)], chess.BLACK, plies)
+        result = game.choose_move()
+        self.assertEqual(result.move.uci(), "f6g8")
+        self.assertEqual(len(engine.calls), 1)
+
+    def test_keeps_repetition_when_alternative_loses_the_edge(self):
+        plies = self.CYCLE + self.CYCLE[:3]
+        game, engine = self.make([scripted("f6g8", -80), scripted("d7d6", -5)], chess.BLACK, plies)
+        result = game.choose_move()
+        self.assertEqual(result.move.uci(), "f6g8")
+        self.assertEqual(len(engine.calls), 2)
+        self.assertAlmostEqual(result.elapsed, 2.0)
+
+    def test_strong_edge_also_avoids_second_occurrence(self):
+        plies = self.CYCLE[:3]
+        game, engine = self.make([scripted("f6g8", -150), scripted("d7d6", -140)], chess.BLACK, plies)
+        result = game.choose_move()
+        self.assertEqual(result.move.uci(), "d7d6")
+        self.assertEqual(result.source, "engine-norep")
+
+    def test_moderate_edge_allows_second_occurrence(self):
+        plies = self.CYCLE[:3]
+        game, engine = self.make([scripted("f6g8", -50)], chess.BLACK, plies)
+        result = game.choose_move()
+        self.assertEqual(result.move.uci(), "f6g8")
+        self.assertEqual(len(engine.calls), 1)
+
+    def test_avoids_fifty_move_draw_when_better(self):
+        game, engine = self.make([scripted("a1b1", 300), scripted("a2a4", 290)], chess.WHITE)
+        game.set_fen("4k3/8/8/8/8/8/P7/R3K3 w - - 99 80")
+        result = game.choose_move()
+        self.assertEqual(result.move.uci(), "a2a4")
+        self.assertEqual(result.source, "engine-norep")
+
+    def test_keeps_move_when_every_alternative_also_draws(self):
+        game, engine = self.make([scripted("a1b1", 300)], chess.WHITE)
+        game.set_fen("4k3/8/8/8/8/8/8/R3K3 w - - 99 80")
+        result = game.choose_move()
+        self.assertEqual(result.move.uci(), "a1b1")
+        self.assertEqual(len(engine.calls), 1)
+
+    def test_never_overrides_forced_mate(self):
+        plies = self.CYCLE + self.CYCLE[:3]
+        game, engine = self.make([scripted("f6g8", -100000)], chess.BLACK, plies)
+        result = game.choose_move()
+        self.assertEqual(result.move.uci(), "f6g8")
+        self.assertEqual(len(engine.calls), 1)
+
+    def test_logs_the_swap(self):
+        plies = self.CYCLE + self.CYCLE[:3]
+        game, engine = self.make([scripted("f6g8", -80), scripted("d7d6", -60)], chess.BLACK, plies)
+        game.choose_move()
+        game.logger.close()
+        self.assertIn("repeticao evitada", game.logger.path.read_text(encoding="utf-8"))
 
 
 class RealEngineGameTest(unittest.TestCase):

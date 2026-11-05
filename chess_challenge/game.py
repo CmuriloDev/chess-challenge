@@ -11,6 +11,11 @@ from .logger import GameLogger
 from .timemanager import TimeBudget, TimeManager
 
 FORCED_MOVE_BUDGET = TimeBudget(0.05, 0.1)
+BETTER_CP = 30
+STRONG_CP = 100
+MATE_CP = 90000
+KEEP_CP = 15
+ALTERNATIVE_SHARE = 0.5
 FINAL_TERMINATIONS = (
     chess.Termination.CHECKMATE,
     chess.Termination.STALEMATE,
@@ -102,6 +107,7 @@ class Game:
             overhead = self.clock.expected_overhead(self._typed)
             budget = self.manager.budget(board, self.clock.remaining, overhead)
             result = self.engine.search(board, budget, self.manager, on_info)
+            result = self._avoid_repetition(result, budget, on_info)
         number = board.fullmove_number
         mover = board.turn
         result.san = board.san(result.move)
@@ -111,6 +117,51 @@ class Game:
         self.logger.engine_move(number, mover, result, self.clock.remaining)
         self._ponder(result)
         return result
+
+    def _our_cp(self, result: SearchResult) -> int:
+        return result.centipawns if self.color == chess.WHITE else -result.centipawns
+
+    def _after(self, move: chess.Move) -> chess.Board:
+        board = self.board.copy()
+        board.push(move)
+        return board
+
+    def _draws_now(self, move: chess.Move) -> bool:
+        board = self._after(move)
+        return board.is_repetition(3) or board.halfmove_clock >= 100
+
+    def _repeats(self, move: chess.Move) -> bool:
+        return self._after(move).is_repetition(2)
+
+    def _avoid_repetition(
+        self,
+        result: SearchResult,
+        budget: TimeBudget,
+        on_info: Callable[[LiveInfo], None] | None,
+    ) -> SearchResult:
+        cp = self._our_cp(result)
+        if result.source != "engine" or cp < BETTER_CP or cp >= MATE_CP:
+            return result
+        strong = cp >= STRONG_CP
+
+        def bad(move: chess.Move) -> bool:
+            return self._draws_now(move) or (strong and self._repeats(move))
+
+        if not bad(result.move):
+            return result
+        allowed = [move for move in self.board.legal_moves if not bad(move)]
+        if not allowed:
+            return result
+        extra = TimeBudget(budget.soft * ALTERNATIVE_SHARE, budget.hard * ALTERNATIVE_SHARE)
+        alternative = self.engine.search(self.board, extra, self.manager, on_info, root_moves=allowed)
+        total = result.elapsed + alternative.elapsed
+        if self._our_cp(alternative) < KEEP_CP:
+            result.elapsed = total
+            return result
+        alternative.elapsed = total
+        alternative.source = "engine-norep"
+        self.logger.event(f"repeticao evitada: {result.move.uci()} trocado por {alternative.move.uci()}")
+        return alternative
 
     def _ponder(self, result: SearchResult) -> None:
         if not self.config.ponder or self.outcome() is not None:

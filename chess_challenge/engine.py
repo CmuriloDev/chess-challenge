@@ -24,6 +24,7 @@ class SearchResult:
     elapsed: float
     source: str
     san: str = field(default="")
+    centipawns: int = 0
 
 
 @dataclass
@@ -113,13 +114,16 @@ class Engine:
         budget: TimeBudget,
         manager: TimeManager,
         on_info: Callable[[LiveInfo], None] | None = None,
+        root_moves: list[chess.Move] | None = None,
     ) -> SearchResult:
         self.stop_ponder()
         last_depth = 0
         start = time.perf_counter()
         tracker = SearchTracker(board.turn)
         limit = chess.engine.Limit(time=budget.hard + LIMIT_GRACE)
-        with self._engine.analysis(board, limit, game=self._game) as analysis:
+        with self._engine.analysis(
+            board, limit, game=self._game, root_moves=root_moves
+        ) as analysis:
             while True:
                 time.sleep(POLL_INTERVAL)
                 elapsed = time.perf_counter() - start
@@ -137,6 +141,8 @@ class Engine:
         elapsed = time.perf_counter() - start
         info = dict(analysis.info)
         pv = list(info.get("pv") or [])
+        score = info.get("score")
+        centipawns = score.white().score(mate_score=100000) if score is not None else 0
         move = best.move or (pv[0] if pv else next(iter(board.legal_moves)))
         if not pv or pv[0] != move:
             pv = [move]
@@ -148,6 +154,7 @@ class Engine:
             pv=pv,
             elapsed=elapsed,
             source="engine",
+            centipawns=centipawns,
         )
 
     def close(self) -> None:
