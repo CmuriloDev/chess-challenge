@@ -101,7 +101,7 @@ Não é preciso sincronizar o relógio. O programa mede sozinho o tempo que a eq
 | `help` | lista os comandos |
 | `quit` | encerra |
 
-Empates por tripla repetição e regra dos 50 lances são detectados automaticamente.
+Tripla repetição, regra dos 50 lances e suas versões automáticas (quíntupla repetição e 75 lances) não encerram a partida no programa: ele mostra um aviso uma única vez, registra no log e continua jogando, já que o tabuleiro físico e o árbitro é que decidem o resultado. O programa só para em xeque-mate, afogamento e material insuficiente.
 
 ## Log
 
