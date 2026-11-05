@@ -2,12 +2,13 @@ import unittest
 
 import chess
 
-from chess_challenge.timemanager import TimeBudget, TimeManager, game_phase
+from chess_challenge.timemanager import PonderCredit, TimeBudget, TimeManager, game_phase
 from chess_challenge.tracker import SearchTracker
 
 
-def make_tracker(depth, last_change, scores, mate=False):
+def make_tracker(depth, last_change, scores, mate=False, best_move=None):
     tracker = SearchTracker(chess.WHITE)
+    tracker.best_move = best_move
     tracker.depth = depth
     tracker.last_change = last_change
     tracker.scores = list(scores)
@@ -52,6 +53,46 @@ class BudgetTest(unittest.TestCase):
         endgame = self.manager.budget(chess.Board("8/5pk1/6p1/8/8/6P1/5PK1/8 w - - 0 40"), 500)
         self.assertGreater(middlegame.soft, 0)
         self.assertGreaterEqual(endgame.soft, middlegame.soft)
+
+
+class CreditTest(unittest.TestCase):
+    def setUp(self):
+        self.manager = TimeManager(increment=10.0, overhead=5.0)
+        self.budget = TimeBudget(soft=10.0, hard=25.0)
+        self.move = chess.Move.from_uci("e2e4")
+        self.credit = PonderCredit(seconds=20.0, depth=24, move=self.move)
+
+    def tracker(self, depth=22, best_move=None, last_change=0.3, scores=(30, 30, 31)):
+        return make_tracker(depth, last_change, scores, best_move=best_move or self.move)
+
+    def test_without_credit_stable_search_keeps_going(self):
+        self.assertFalse(self.manager.should_stop(1.0, self.budget, self.tracker()))
+
+    def test_credit_lets_a_confirmed_search_stop_early(self):
+        self.assertTrue(self.manager.should_stop(1.0, self.budget, self.tracker(), self.credit))
+
+    def test_no_credit_when_best_move_differs(self):
+        other = chess.Move.from_uci("d2d4")
+        tracker = self.tracker(best_move=other)
+        self.assertFalse(self.manager.should_stop(1.0, self.budget, tracker, self.credit))
+
+    def test_no_credit_before_search_catches_up_in_depth(self):
+        self.assertFalse(self.manager.should_stop(1.0, self.budget, self.tracker(depth=15), self.credit))
+
+    def test_no_credit_for_shallow_ponder(self):
+        shallow = PonderCredit(seconds=20.0, depth=8, move=self.move)
+        self.assertFalse(self.manager.should_stop(1.0, self.budget, self.tracker(depth=11), shallow))
+
+    def test_no_credit_in_the_first_instants(self):
+        self.assertFalse(self.manager.should_stop(0.1, self.budget, self.tracker(), self.credit))
+
+    def test_unstable_search_still_needs_more_time(self):
+        tracker = make_tracker(22, 0.9, [80, 60, 20], best_move=self.move)
+        self.assertFalse(self.manager.should_stop(1.0, self.budget, tracker, self.credit))
+        self.assertTrue(self.manager.should_stop(6.5, self.budget, tracker, self.credit))
+
+    def test_credit_never_beats_the_hard_limit(self):
+        self.assertTrue(self.manager.should_stop(25.0, self.budget, self.tracker(), None))
 
 
 class StopTest(unittest.TestCase):

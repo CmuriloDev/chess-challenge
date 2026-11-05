@@ -7,7 +7,7 @@ import chess
 import chess.engine
 
 from .config import Config
-from .timemanager import TimeBudget, TimeManager
+from .timemanager import PonderCredit, TimeBudget, TimeManager
 from .tracker import SearchTracker
 
 POLL_INTERVAL = 0.01
@@ -69,6 +69,9 @@ class Engine:
         self._engine = chess.engine.SimpleEngine.popen_uci(str(config.engine_path))
         self._game = object()
         self._ponder: chess.engine.SimpleAnalysis | None = None
+        self._ponder_fen = ""
+        self._ponder_started = 0.0
+        self._credit: tuple[str, PonderCredit] | None = None
         self._configure(config)
 
     def _configure(self, config: Config) -> None:
@@ -85,12 +88,15 @@ class Engine:
 
     def new_game(self) -> None:
         self._game = object()
+        self._credit = None
 
     def start_ponder(self, board: chess.Board) -> None:
         self.stop_ponder()
         if board.is_game_over():
             return
         self._ponder = self._engine.analysis(board, chess.engine.Limit(), game=self._game)
+        self._ponder_fen = board.fen()
+        self._ponder_started = time.perf_counter()
 
     def stop_ponder(self) -> None:
         analysis, self._ponder = self._ponder, None
@@ -100,7 +106,18 @@ class Engine:
             analysis.stop()
             analysis.wait()
         except chess.engine.EngineError:
-            pass
+            return
+        info = dict(analysis.info)
+        pv = info.get("pv") or []
+        if pv and info.get("depth"):
+            seconds = time.perf_counter() - self._ponder_started
+            self._credit = (self._ponder_fen, PonderCredit(seconds, int(info["depth"]), pv[0]))
+
+    def _take_credit(self, board: chess.Board) -> PonderCredit | None:
+        stored, self._credit = self._credit, None
+        if stored is not None and stored[0] == board.fen():
+            return stored[1]
+        return None
 
     def ponder_live(self) -> LiveInfo | None:
         analysis = self._ponder
@@ -117,6 +134,7 @@ class Engine:
         root_moves: list[chess.Move] | None = None,
     ) -> SearchResult:
         self.stop_ponder()
+        credit = self._take_credit(board)
         last_depth = 0
         start = time.perf_counter()
         tracker = SearchTracker(board.turn)
@@ -134,7 +152,7 @@ class Engine:
                     if live is not None:
                         last_depth = live.depth
                         on_info(live)
-                if manager.should_stop(elapsed, budget, tracker):
+                if manager.should_stop(elapsed, budget, tracker, credit):
                     break
             analysis.stop()
             best = analysis.wait()

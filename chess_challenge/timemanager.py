@@ -18,12 +18,23 @@ MAX_SOFT_SHARE = 0.10
 MAX_HARD_SHARE = 0.25
 HARD_MULTIPLIER = 2.5
 PANIC_SOFT_SHARE = 0.05
+CREDIT_SHARE = 0.8
+CREDIT_MIN_DEPTH = 12
+CREDIT_DEPTH_SLACK = 2
+CREDIT_MIN_ELAPSED = 0.25
 
 
 @dataclass(frozen=True)
 class TimeBudget:
     soft: float
     hard: float
+
+
+@dataclass(frozen=True)
+class PonderCredit:
+    seconds: float
+    depth: int
+    move: chess.Move
 
 
 def game_phase(board: chess.Board) -> float:
@@ -63,20 +74,45 @@ class TimeManager:
         hard = max(soft, min(soft * HARD_MULTIPLIER, remaining * MAX_HARD_SHARE))
         return TimeBudget(soft, hard)
 
-    def should_stop(self, elapsed: float, budget: TimeBudget, tracker: SearchTracker) -> bool:
+    def should_stop(
+        self,
+        elapsed: float,
+        budget: TimeBudget,
+        tracker: SearchTracker,
+        credit: PonderCredit | None = None,
+    ) -> bool:
         if elapsed >= budget.hard:
             return True
         if tracker.mate and tracker.depth >= MATE_MIN_DEPTH and elapsed >= MIN_SOFT:
             return True
-        target = min(budget.soft * self._factor(elapsed, budget, tracker), budget.hard)
-        return elapsed >= target
+        confirmed = self._confirmed(elapsed, tracker, credit)
+        target = min(budget.soft * self._factor(elapsed, budget, tracker, confirmed), budget.hard)
+        bonus = min(credit.seconds * CREDIT_SHARE, budget.soft) if confirmed and credit else 0.0
+        return elapsed + bonus >= target
 
-    def _factor(self, elapsed: float, budget: TimeBudget, tracker: SearchTracker) -> float:
+    def _confirmed(
+        self, elapsed: float, tracker: SearchTracker, credit: PonderCredit | None
+    ) -> bool:
+        if credit is None or elapsed < CREDIT_MIN_ELAPSED:
+            return False
+        if credit.depth < CREDIT_MIN_DEPTH or tracker.best_move != credit.move:
+            return False
+        return tracker.depth >= credit.depth - CREDIT_DEPTH_SLACK
+
+    def _factor(
+        self,
+        elapsed: float,
+        budget: TimeBudget,
+        tracker: SearchTracker,
+        confirmed: bool = False,
+    ) -> float:
         if tracker.depth < MIN_DEPTH:
             return 1.0
         since_change = elapsed - tracker.last_change
-        if tracker.drop >= DROP_THRESHOLD or since_change < RECENT_CHANGE_RATIO * budget.soft:
+        recent = since_change < RECENT_CHANGE_RATIO * budget.soft and not confirmed
+        if tracker.drop >= DROP_THRESHOLD or recent:
             return UNSTABLE_FACTOR
-        if tracker.drop <= STABLE_DROP and elapsed > 0 and since_change / elapsed >= STABLE_RATIO:
+        steady = confirmed or (elapsed > 0 and since_change / elapsed >= STABLE_RATIO)
+        if tracker.drop <= STABLE_DROP and steady:
             return STABLE_FACTOR
         return 1.0

@@ -49,6 +49,33 @@ class EngineTest(unittest.TestCase):
         self.assertIsNotNone(live)
         self.assertIsNone(self.engine.ponder_live())
 
+    def test_ponder_credit_shortens_search_on_predicted_reply(self):
+        board = chess.Board()
+        for uci in ("e2e4", "e7e5"):
+            board.push_uci(uci)
+        self.engine.new_game()
+        self.engine.start_ponder(board)
+        time.sleep(4.0)
+        budget = TimeBudget(6.0, 12.0)
+        credited = self.engine.search(board, budget, self.manager)
+        plain = self.engine.search(board, budget, self.manager)
+        self.assertLess(credited.elapsed, 2.5)
+        self.assertLess(credited.elapsed, plain.elapsed - 1.0)
+        self.assertIn(credited.move, board.legal_moves)
+
+    def test_ponder_credit_is_ignored_on_a_different_position(self):
+        board = chess.Board()
+        board.push_uci("e2e4")
+        self.engine.new_game()
+        predicted = board.copy()
+        predicted.push_uci("e7e5")
+        self.engine.start_ponder(predicted)
+        time.sleep(2.0)
+        surprise = board.copy()
+        surprise.push_uci("c7c5")
+        result = self.engine.search(surprise, TimeBudget(2.0, 4.0), self.manager)
+        self.assertGreater(result.elapsed, 1.0)
+
     def test_finds_mate_in_one(self):
         board = chess.Board("r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4")
         result = self.engine.search(board, TimeBudget(1.0, 2.0), self.manager)
