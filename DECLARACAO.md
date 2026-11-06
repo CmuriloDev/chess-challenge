@@ -29,6 +29,8 @@ Resumo do algoritmo:
 4. Durante a busca, o orçamento é ajustado: estende em até 60% se o melhor lance mudou há pouco ou a avaliação caiu 40 centipeões ou mais; reduz em 40% se o melhor lance está estável e a avaliação não oscila; encerra imediatamente ao encontrar mate a favor.
 5. Com menos de 15 segundos no relógio, entra em modo de emergência com lances curtos.
 
+Também é de autoria própria a escolha entre o lance do motor e um lance alternativo (`chess_challenge/game.py`, `_avoid_repetition`): quando a avaliação nos favorece em 30 centipeões ou mais, o programa descarta lances que levariam à tripla repetição ou ao empate pela regra dos 50 lances (e, com vantagem de 100 centipeões ou mais, também a primeira repetição), e refaz a busca restrita aos lances restantes, mantendo o resultado só se ele continuar com pelo menos 15 centipeões a nosso favor.
+
 ## Livro de aberturas
 
 Livro Polyglot `komodo.bin` (Salvo Spitaleri, motor Komodo), obtido na coleção https://github.com/ChrisWhittington/polyglot-books e baixado antes do evento por `scripts/fetch_data.py`. Carregado localmente. Limite de 10 meios-lances aplicado em `chess_challenge/book.py`. Material de terceiros, não conta como autoria.

@@ -66,6 +66,7 @@ class Engine:
     def __init__(self, config: Config) -> None:
         if not config.engine_path.exists():
             raise FileNotFoundError(f"Stockfish nao encontrado em {config.engine_path}")
+        self._config = config
         self._engine = chess.engine.SimpleEngine.popen_uci(str(config.engine_path))
         self._game = object()
         self._ponder: chess.engine.SimpleAnalysis | None = None
@@ -125,7 +126,32 @@ class Engine:
             return None
         return make_live(dict(analysis.info), 0.0)
 
+    def restart(self) -> None:
+        self._ponder = None
+        self._credit = None
+        try:
+            self._engine.close()
+        except Exception:
+            pass
+        self._engine = chess.engine.SimpleEngine.popen_uci(str(self._config.engine_path))
+        self._game = object()
+        self._configure(self._config)
+
     def search(
+        self,
+        board: chess.Board,
+        budget: TimeBudget,
+        manager: TimeManager,
+        on_info: Callable[[LiveInfo], None] | None = None,
+        root_moves: list[chess.Move] | None = None,
+    ) -> SearchResult:
+        try:
+            return self._search(board, budget, manager, on_info, root_moves)
+        except chess.engine.EngineError:
+            self.restart()
+            return self._search(board, budget, manager, on_info, root_moves)
+
+    def _search(
         self,
         board: chess.Board,
         budget: TimeBudget,

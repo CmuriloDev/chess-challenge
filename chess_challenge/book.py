@@ -16,6 +16,7 @@ class Book:
             return None
         try:
             with chess.polyglot.open_reader(str(self._path)) as reader:
-                return reader.weighted_choice(board).move
+                move = reader.weighted_choice(board).move
         except IndexError:
             return None
+        return move if move in board.legal_moves else None

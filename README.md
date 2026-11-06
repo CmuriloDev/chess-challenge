@@ -59,7 +59,7 @@ Opções:
 | Opção | Padrão | Descrição |
 | --- | --- | --- |
 | `--color` | pergunta na interface | `white` ou `black` (aceita `brancas`/`pretas`); obrigatório com `--cli` |
-| `--threads` | núcleos lógicos − 2 | threads do Stockfish |
+| `--threads` | núcleos lógicos − 1 | threads do Stockfish |
 | `--hash` | 8192 | tabela hash em MB |
 | `--time` | `15:00` | tempo total da partida |
 | `--increment` | 10 | incremento por lance, em segundos |

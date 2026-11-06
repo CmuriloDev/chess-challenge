@@ -24,7 +24,9 @@ FINAL_TERMINATIONS = (
 
 
 class IllegalMove(Exception):
-    pass
+    def __init__(self, text: str = "", hint: str = "") -> None:
+        super().__init__(text)
+        self.hint = hint
 
 
 class Game:
@@ -78,6 +80,13 @@ class Game:
         except ValueError as error:
             raise IllegalMove(text) from error
         if move not in self.board.legal_moves:
+            if move.promotion is None and any(
+                legal.from_square == move.from_square
+                and legal.to_square == move.to_square
+                and legal.promotion
+                for legal in self.board.legal_moves
+            ):
+                raise IllegalMove(text, f"falta a peca da promocao (ex.: {move.uci()}q)")
             raise IllegalMove(text)
         self.engine.stop_ponder()
         self.ponder_board = None

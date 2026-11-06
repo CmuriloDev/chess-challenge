@@ -31,6 +31,16 @@ class EngineTest(unittest.TestCase):
         self.assertGreater(result.depth, 0)
         self.assertGreater(result.nodes, 0)
 
+    def test_recovers_when_engine_process_dies(self):
+        engine = Engine(Config(threads=1, hash_mb=16))
+        try:
+            engine._engine.close()
+            board = chess.Board()
+            result = engine.search(board, TimeBudget(0.3, 0.6), self.manager)
+            self.assertIn(result.move, board.legal_moves)
+        finally:
+            engine.close()
+
     def test_reports_live_info_while_searching(self):
         updates = []
         self.engine.search(chess.Board(), TimeBudget(0.5, 1.0), self.manager, updates.append)

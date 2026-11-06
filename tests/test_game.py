@@ -56,6 +56,14 @@ class GameTest(unittest.TestCase):
             with self.assertRaises(IllegalMove):
                 game.apply_opponent_move(text)
 
+    def test_missing_promotion_letter_gets_a_hint(self):
+        game = self.make(color=chess.BLACK, directory=self.directory.name)
+        game.set_fen("8/4P3/8/8/8/k7/8/4K3 w - - 0 1")
+        with self.assertRaises(IllegalMove) as caught:
+            game.apply_opponent_move("e7e8")
+        self.assertIn("promocao", caught.exception.hint)
+        self.assertEqual(game.board.fen(), "8/4P3/8/8/8/k7/8/4K3 w - - 0 1")
+
     def test_accepts_uci_promotion(self):
         game = self.make(color=chess.BLACK, directory=self.directory.name)
         game.set_fen("8/4P3/8/8/8/k7/8/4K3 w - - 0 1")

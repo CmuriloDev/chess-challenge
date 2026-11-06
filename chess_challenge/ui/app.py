@@ -566,10 +566,11 @@ class App:
         self.selected = None
         try:
             game.apply_opponent_move(text, latency)
-        except IllegalMove:
+        except IllegalMove as error:
             self.first_input = None
             self.entry.delete(0, "end")
-            self.notify(f"Lance ilegal ou invalido: {text}. Confira o tabuleiro fisico.", DANGER)
+            extra = f" ({error.hint})" if error.hint else ""
+            self.notify(f"Lance ilegal ou invalido: {text}{extra}. Confira o tabuleiro fisico.", DANGER)
             self.refresh()
             return
         self.first_input = None

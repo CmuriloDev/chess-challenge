@@ -37,7 +37,7 @@ def default_syzygy_path() -> Path | None:
 
 
 def default_threads() -> int:
-    return max(1, (os.cpu_count() or 2) - 2)
+    return max(1, (os.cpu_count() or 2) - 1)
 
 
 @dataclass

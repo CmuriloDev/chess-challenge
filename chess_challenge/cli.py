@@ -159,8 +159,9 @@ def play_opponent(game: Game, text: str) -> None:
         return
     try:
         game.apply_opponent_move(text)
-    except IllegalMove:
-        print(f"Lance ilegal ou invalido: {text}. Confira o tabuleiro fisico.")
+    except IllegalMove as error:
+        extra = f" ({error.hint})" if error.hint else ""
+        print(f"Lance ilegal ou invalido: {text}{extra}. Confira o tabuleiro fisico.")
         return
     if game.outcome() is None:
         play_turn(game)
